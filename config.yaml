@@ -1,0 +1,20 @@
+# 配置文件
+# 单位: 像素
+# 这里使用的是PHash
+
+# 比较的文件
+base: img/all.jpg
+
+# 模板文件
+part: img/3.jpg
+
+# 图片滑动step
+stepX: 2
+stepY: 2
+
+# 比较文件单位格子宽高
+baseW: 100
+baseH: 100
+
+# PHash相似度要求
+similarLimit: 8
