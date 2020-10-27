@@ -15,6 +15,7 @@ type Config struct {
 	BaseW        int    `yaml:"baseW"`
 	BaseH        int    `yaml:"baseH"`
 	SimilarLimit int    `yaml:"similarLimit"`
+	BlurryPixel  int    `yaml:"blurryPixel"`
 }
 
 func newConfig(fileName string) *Config {
@@ -27,7 +28,19 @@ func newConfig(fileName string) *Config {
 	e = yaml.Unmarshal(sliFile, ptrConfig)
 	failOnError(e, "config unmarshal failed")
 
+	ptrConfig.init()
+
 	logPrintf("配置:%+v", *ptrConfig)
 
 	return ptrConfig
+}
+
+func (this *Config) init() {
+	maxStep := this.StepX
+	if maxStep < this.StepY {
+		maxStep = this.StepY
+	}
+	if this.BlurryPixel < maxStep {
+		this.BlurryPixel = maxStep
+	}
 }

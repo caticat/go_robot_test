@@ -3,10 +3,10 @@
 # 这里使用的是PHash
 
 # 比较的文件
-base: screenshot/all.jpg
+base: screenshot/0all.jpg
 
 # 模板目录文件
-pathPart: img
+pathPart: img/number
 
 # 模板扩展名
 partExt: jpg
@@ -15,9 +15,12 @@ partExt: jpg
 stepX: 2
 stepY: 2
 
-# 比较文件单位格子宽高
-baseW: 100
+# 比较文件单位格子宽高(不写则和模板图片宽高一致)
+baseW: 75
 baseH: 100
 
 # PHash相似度要求
 similarLimit: 8
+
+# 取精确值时模糊的像素宽度(会在匹配点周围搜索,找到最匹配的一个点)(最小值为'图片滑动step'的最大值)
+blurryPixel: 5

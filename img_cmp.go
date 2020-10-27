@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"gocv.io/x/gocv"
 	"gocv.io/x/gocv/contrib"
 	"image"
+	"image/jpeg"
+	"io/ioutil"
 	"log"
 	"time"
 )
@@ -38,7 +41,7 @@ func getSliPosInPic(ptrPic *Pic, ptrSubPic *SubPic) []*Pos {
 			defer subBaseM.Close()
 			hashCompute(hash, subBaseI, &subBaseM)
 			if isSame, _ := isSameMat(hash, &subBaseM, &ptrSubPic.m_mat); isSame {
-				//logPrintf("匹配成功起始点:(%v, %v),相似度:%v,花费时间:%v(秒)", x, y, similar, float32(timeEnd-timeBegin)/1000.0)
+				//logPrintf("匹配成功起始点:(%v, %v),相似度:%v", x, y, similar)
 				ptrPos := newPos()
 				ptrPos.init(x, y)
 				sliPos = append(sliPos, ptrPos)
@@ -56,6 +59,131 @@ func getSliPosInPic(ptrPic *Pic, ptrSubPic *SubPic) []*Pos {
 	}
 
 	return sliPos
+}
+
+// 获取子图片出现的数量 只横移一行
+func getSubPicNumSlideX(ptrPic *Pic, ptrSubPic *SubPic, ptrBeginPos *Pos) int {
+	// 参数校验
+	assert(ptrPic != nil, "ptrPic == nil")
+	assert(ptrSubPic != nil, "ptrSubPic == nil")
+	assert(ptrBeginPos != nil, "ptrBeginPos == nil")
+
+	// 参数整理
+	picWidth := ptrPic.width()
+	picSubWidth := g_ptrConfig.BaseW
+	picSubHeight := g_ptrConfig.BaseH
+	if (picSubWidth == 0) || (picSubHeight == 0) {
+		picSubWidth = ptrSubPic.width()
+		picSubHeight = ptrSubPic.height()
+	}
+
+	counter := 0
+	hash := getHash()
+	pic := ptrPic.m_pic.(*image.YCbCr)
+	y := ptrBeginPos.m_y
+	for x := ptrBeginPos.m_x; x < picWidth; x += picSubWidth {
+		r := image.Rect(x, y, x+picSubWidth, y+picSubHeight)
+		subBaseI := pic.SubImage(r)
+		subBaseM := gocv.NewMat()
+		defer subBaseM.Close()
+		hashCompute(hash, subBaseI, &subBaseM)
+		if isSame, _ := isSameMat(hash, &subBaseM, &ptrSubPic.m_mat); isSame {
+			//logPrintf("相似度:%v", similar)
+			counter++
+		}
+	}
+
+	return counter
+}
+
+// 获取图片中第一个匹配的起始点的精准坐标
+func getFirstPos(ptrPic *Pic, ptrSubPic *SubPic) *Pos {
+	// 参数校验
+	assert(ptrPic != nil, "ptrPic == nil")
+	assert(ptrSubPic != nil, "ptrSubPic == nil")
+
+	// 参数整理
+	picWidth := ptrPic.width()
+	picHeight := ptrPic.height()
+	picSubWidth := g_ptrConfig.BaseW
+	picSubHeight := g_ptrConfig.BaseH
+	if (picSubWidth == 0) || (picSubHeight == 0) {
+		picSubWidth = ptrSubPic.width()
+		picSubHeight = ptrSubPic.height()
+	}
+
+	hash := getHash()
+	pic := ptrPic.m_pic.(*image.YCbCr)
+	for y := 0; y <= (picHeight - picSubHeight); y += g_ptrConfig.StepY {
+		for x := 0; x <= (picWidth - picSubWidth); x += g_ptrConfig.StepX {
+			r := image.Rect(x, y, x+picSubWidth, y+picSubHeight)
+			subBaseI := pic.SubImage(r)
+			subBaseM := gocv.NewMat()
+			defer subBaseM.Close()
+			hashCompute(hash, subBaseI, &subBaseM)
+			if isSame, similar := isSameMat(hash, &subBaseM, &ptrSubPic.m_mat); isSame {
+				beginPos := newPos()
+				beginPos.init(x, y)
+				ptrResultPos, similarV := getMostSimilarPos(ptrPic, ptrSubPic, beginPos, picWidth, picHeight, picSubWidth, picSubHeight)
+				assert(ptrResultPos != nil, "ptrResultPos == nil")
+				logPrintf("值:%v,匹配成功起始点:(%v, %v),相似度:%v,最相似点:(%v, %v),相似度:%v", ptrSubPic.m_value, x, y, similar, ptrResultPos.m_x, ptrResultPos.m_y, similarV)
+				return ptrResultPos
+			}
+		}
+	}
+
+	return nil
+}
+
+func getMostSimilarPos(ptrPic *Pic, ptrSubPic *SubPic, ptrBeginPos *Pos, picWidth, picHeight, picSubWidth, picSubHeight int) (*Pos, int) {
+	// 参数校验
+	assert(ptrPic != nil, "ptrPic == nil")
+	assert(ptrSubPic != nil, "ptrSubPic == nil")
+	assert(ptrBeginPos != nil, "ptrBeginPos == nil")
+
+	beginX := ptrBeginPos.m_x - g_ptrConfig.BlurryPixel
+	if beginX < 0 {
+		beginX = 0
+	}
+	beginY := ptrBeginPos.m_y
+	endX := ptrBeginPos.m_x + g_ptrConfig.BlurryPixel
+	if endX > picWidth {
+		endX = picWidth
+	}
+	endY := ptrBeginPos.m_y + g_ptrConfig.BlurryPixel
+	if endY > picHeight {
+		endY = picHeight
+	}
+
+	hash := getHash()
+	pic := ptrPic.m_pic.(*image.YCbCr)
+	valuePos := newValuePos()
+	valuePos.m_value = 0xEFFFFFFF
+	found := false
+	for y := beginY; y < endY; y++ {
+		for x := beginX; x < endX; x++ {
+			r := image.Rect(x, y, x+picSubWidth, y+picSubHeight)
+			subBaseI := pic.SubImage(r)
+			subBaseM := gocv.NewMat()
+			defer subBaseM.Close()
+			hashCompute(hash, subBaseI, &subBaseM)
+			if isSame, similar := isSameMat(hash, &subBaseM, &ptrSubPic.m_mat); isSame {
+				//logPrintf("坐标:(%v,%v),相似度:%v", x, y, similar)
+				if valuePos.m_value > int(similar) {
+					valuePos.m_value = int(similar)
+					valuePos.m_ptrPos.m_x = x
+					valuePos.m_ptrPos.m_y = y
+					found = true
+				}
+			}
+		}
+	}
+
+	if found {
+		return valuePos.m_ptrPos, valuePos.m_value
+	} else {
+		return nil, -1
+	}
 }
 
 func getHash() contrib.ImgHashBase {
@@ -126,7 +254,7 @@ func isSameImg(baseI image.Image, partI image.Image) bool {
 	similar := hash.Compare(baseMT, partMT)
 
 	logPrintf("phash:%v", similar)
-	return similar <= 8 // TODO(pan): 这里需要改成配置
+	return int(similar) <= g_ptrConfig.SimilarLimit
 }
 
 func isSameMat(hash contrib.ImgHashBase, ptrBaseM *gocv.Mat, ptrPartM *gocv.Mat) (bool, float64) {
@@ -145,6 +273,47 @@ func hashCompute(hash contrib.ImgHashBase, img image.Image, ptrOut *gocv.Mat) {
 	if ptrOut.Empty() {
 		log.Fatalf("error computing hash for base")
 	}
+}
+
+// 测试=================================
+
+// 测试指定坐标是否相似
+func testPosInPic(ptrPic *Pic, ptrSubPic *SubPic, ptrPos *Pos) []*Pos {
+	// 参数校验
+	assert(ptrPic != nil, "ptrPic == nil")
+	assert(ptrSubPic != nil, "ptrSubPic == nil")
+	assert(ptrPos != nil, "ptrPos == nil")
+
+	// 参数整理
+	picSubWidth := g_ptrConfig.BaseW
+	picSubHeight := g_ptrConfig.BaseH
+	if (picSubWidth == 0) || (picSubHeight == 0) {
+		picSubWidth = ptrSubPic.width()
+		picSubHeight = ptrSubPic.height()
+	}
+
+	sliPos := make([]*Pos, 0)
+	hash := getHash()
+
+	pic := ptrPic.m_pic.(*image.YCbCr)
+	r := image.Rect(ptrPos.m_x, ptrPos.m_y, ptrPos.m_x+picSubWidth, ptrPos.m_y+picSubHeight)
+	subBaseI := pic.SubImage(r)
+	subBaseM := gocv.NewMat()
+	defer subBaseM.Close()
+	hashCompute(hash, subBaseI, &subBaseM)
+	isSame, similar := isSameMat(hash, &subBaseM, &ptrSubPic.m_mat)
+	logPrintf("起始点:(%v,%v),相似度:%v,是否相同:%v", ptrPos.m_x, ptrPos.m_y, similar, isSame)
+
+	testSaveImg(subBaseI)
+
+	return sliPos
+}
+
+func testSaveImg(i image.Image) {
+	b := bytes.NewBuffer(nil)
+	e := jpeg.Encode(b, i, nil)
+	failOnError(e, "jpeg encode failed")
+	ioutil.WriteFile("a.jpg", b.Bytes(), 0666)
 }
 
 //var (
