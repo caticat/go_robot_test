@@ -8,12 +8,13 @@ import (
 type Config struct {
 	fileName     string
 	Base         string
-	Part         string
-	StepX        int `yaml:"stepX"`
-	StepY        int `yaml:"stepY"`
-	BaseW        int `yaml:"baseW"`
-	BaseH        int `yaml:"baseH"`
-	SimilarLimit int `yaml:"similarLimit"`
+	PathPart     string `yaml:"pathPart"`
+	PartExt      string `yaml:"partExt"`
+	StepX        int    `yaml:"stepX"`
+	StepY        int    `yaml:"stepY"`
+	BaseW        int    `yaml:"baseW"`
+	BaseH        int    `yaml:"baseH"`
+	SimilarLimit int    `yaml:"similarLimit"`
 }
 
 func newConfig(fileName string) *Config {

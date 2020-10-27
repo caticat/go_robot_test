@@ -8,6 +8,60 @@ import (
 	"time"
 )
 
+// 获取在图片中的所有位置
+func getSliPosInPic(ptrPic *Pic, ptrSubPic *SubPic) []*Pos {
+	// 参数校验
+	assert(ptrPic != nil, "ptrPic == nil")
+	assert(ptrSubPic != nil, "ptrSubPic == nil")
+
+	// 参数整理
+	picWidth := ptrPic.width()
+	picHeight := ptrPic.height()
+	picSubWidth := g_ptrConfig.BaseW
+	picSubHeight := g_ptrConfig.BaseH
+	if (picSubWidth == 0) || (picSubHeight == 0) {
+		picSubWidth = ptrSubPic.width()
+		picSubHeight = ptrSubPic.height()
+	}
+
+	sliPos := make([]*Pos, 0)
+	hash := getHash()
+
+	hasFound := false
+	pic := ptrPic.m_pic.(*image.YCbCr)
+	for y := 0; y <= (picHeight - picSubHeight); {
+		hasFound = false
+		for x := 0; x <= (picWidth - picSubWidth); {
+			r := image.Rect(x, y, x+picSubWidth, y+picSubHeight)
+			subBaseI := pic.SubImage(r)
+			subBaseM := gocv.NewMat()
+			defer subBaseM.Close()
+			hashCompute(hash, subBaseI, &subBaseM)
+			if isSame, _ := isSameMat(hash, &subBaseM, &ptrSubPic.m_mat); isSame {
+				//logPrintf("匹配成功起始点:(%v, %v),相似度:%v,花费时间:%v(秒)", x, y, similar, float32(timeEnd-timeBegin)/1000.0)
+				ptrPos := newPos()
+				ptrPos.init(x, y)
+				sliPos = append(sliPos, ptrPos)
+				hasFound = true
+				x += picSubWidth
+			} else {
+				x += g_ptrConfig.StepX
+			}
+		}
+		if hasFound {
+			y += picSubHeight
+		} else {
+			y += g_ptrConfig.StepY
+		}
+	}
+
+	return sliPos
+}
+
+func getHash() contrib.ImgHashBase {
+	return contrib.PHash{}
+}
+
 // 图片是否包含
 func contain(baseI image.Image, partI image.Image) bool {
 	timeBegin := time.Now().UnixNano() / 1e6
@@ -19,7 +73,7 @@ func contain(baseI image.Image, partI image.Image) bool {
 
 	logPrintf("源图片宽:%v,高:%v;滑动窗口宽:%v,高:%v", baseW, baseH, partW, partH)
 
-	hash := contrib.PHash{}
+	hash := getHash()
 	partM := gocv.NewMat()
 	defer partM.Close()
 	hashCompute(hash, partI, &partM)
@@ -56,7 +110,7 @@ func isSameImg(baseI image.Image, partI image.Image) bool {
 	baseMT := gocv.NewMat()
 	defer baseMT.Close()
 	//hash := contrib.AverageHash{}
-	hash := contrib.PHash{}
+	hash := getHash()
 	hash.Compute(baseM, &baseMT)
 	if baseMT.Empty() {
 		log.Fatalf("error computing hash for base")
@@ -80,7 +134,7 @@ func isSameMat(hash contrib.ImgHashBase, ptrBaseM *gocv.Mat, ptrPartM *gocv.Mat)
 	similar := hash.Compare(*ptrBaseM, *ptrPartM)
 
 	//logPrintf("hash similar:", similar)
-	return similar <= float64(g_ptrConfig.SimilarLimit), similar // TODO(pan): 这里需要改成配置
+	return similar <= float64(g_ptrConfig.SimilarLimit), similar
 }
 
 func hashCompute(hash contrib.ImgHashBase, img image.Image, ptrOut *gocv.Mat) {
@@ -108,7 +162,7 @@ func hashCompute(hash contrib.ImgHashBase, img image.Image, ptrOut *gocv.Mat) {
 //	var hashes []contrib.ImgHashBase
 //
 //	if *usePHash || *useAll {
-//		hashes = append(hashes, contrib.PHash{})
+//		hashes = append(hashes, getHash())
 //	}
 //	if *useAverage || *useAll {
 //		hashes = append(hashes, contrib.AverageHash{})

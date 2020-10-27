@@ -3,10 +3,13 @@
 # 这里使用的是PHash
 
 # 比较的文件
-base: img/all.jpg
+base: screenshot/all.jpg
 
-# 模板文件
-part: img/3.jpg
+# 模板目录文件
+pathPart: img
+
+# 模板扩展名
+partExt: jpg
 
 # 图片滑动step
 stepX: 2
