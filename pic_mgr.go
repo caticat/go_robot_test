@@ -37,7 +37,8 @@ func (this *PicMgr) calc(baseFileName string) {
 	//}
 
 	// 获取所有值出现的数量
-	this.calcCounter(ptrPic)
+	//this.calcCounter(ptrPic)
+	this.calcCounterAll(ptrPic)
 }
 
 // 获取所有值出现的数量
@@ -55,6 +56,24 @@ func (this *PicMgr) calcCounter(ptrPic *Pic) {
 		counter := getSubPicNumSlideX(ptrPic, ptrSubPic, ptrBeginPos)
 		mapCounter[ptrSubPic.m_value] = counter
 	}
+
+	logPrintf("匹配类型数量:%v", len(mapCounter))
+	for value, counter := range mapCounter {
+		logPrintf("值:%v,数量:%v", value, counter)
+	}
+}
+
+// 获取所有值出现的数量 单次匹配全部获取
+func (this *PicMgr) calcCounterAll(ptrPic *Pic) {
+	assert(ptrPic != nil, "ptrPic == nil")
+
+	ptrBeginPos := this.getMatchBeginPos(ptrPic)
+	if ptrBeginPos == nil {
+		logPrintf("没有任何图片匹配")
+		return
+	}
+
+	mapCounter := getSubPicNumSlideXAll(ptrPic, this.m_mapPic, ptrBeginPos)
 
 	logPrintf("匹配类型数量:%v", len(mapCounter))
 	for value, counter := range mapCounter {

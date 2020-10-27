@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"gocv.io/x/gocv"
 	"gocv.io/x/gocv/contrib"
 	"image"
@@ -76,11 +77,11 @@ func getSubPicNumSlideX(ptrPic *Pic, ptrSubPic *SubPic, ptrBeginPos *Pos) int {
 		picSubWidth = ptrSubPic.width()
 		picSubHeight = ptrSubPic.height()
 	}
-
-	counter := 0
 	hash := getHash()
 	pic := ptrPic.m_pic.(*image.YCbCr)
 	y := ptrBeginPos.m_y
+
+	counter := 0
 	for x := ptrBeginPos.m_x; x < picWidth; x += picSubWidth {
 		r := image.Rect(x, y, x+picSubWidth, y+picSubHeight)
 		subBaseI := pic.SubImage(r)
@@ -94,6 +95,48 @@ func getSubPicNumSlideX(ptrPic *Pic, ptrSubPic *SubPic, ptrBeginPos *Pos) int {
 	}
 
 	return counter
+}
+
+// 获取子图片出现的数量 只横移一行 单次匹配全部获取
+func getSubPicNumSlideXAll(ptrPic *Pic, mapSubPic map[int]*SubPic, ptrBeginPos *Pos) map[int]int {
+	// 参数校验
+	assert(ptrPic != nil, "ptrPic == nil")
+	assert(ptrBeginPos != nil, "ptrBeginPos == nil")
+	assert(len(mapSubPic) > 0, "len(mapSubPic) == 0")
+	if _, ok := mapSubPic[1]; !ok {
+		failOnError(errors.New("mapSubPic do not contain 1"), "getSubPicNumSlideXAll")
+	}
+
+	// 参数整理
+	picWidth := ptrPic.width()
+	picSubWidth := g_ptrConfig.BaseW
+	picSubHeight := g_ptrConfig.BaseH
+	if (picSubWidth == 0) || (picSubHeight == 0) {
+		picSubWidth = mapSubPic[1].width()
+		picSubHeight = mapSubPic[1].height()
+	}
+	hash := getHash()
+	pic := ptrPic.m_pic.(*image.YCbCr)
+	y := ptrBeginPos.m_y
+	mapCounter := make(map[int]int)
+
+	// 计算
+	for x := ptrBeginPos.m_x; x < picWidth; x += picSubWidth {
+		r := image.Rect(x, y, x+picSubWidth, y+picSubHeight)
+		subBaseI := pic.SubImage(r)
+		subBaseM := gocv.NewMat()
+		defer subBaseM.Close()
+		hashCompute(hash, subBaseI, &subBaseM)
+		for _, ptrSubPic := range mapSubPic {
+			if isSame, _ := isSameMat(hash, &subBaseM, &ptrSubPic.m_mat); isSame {
+				//logPrintf("相似度:%v", similar)
+				mapCounter[ptrSubPic.m_value]++
+				break
+			}
+		}
+	}
+
+	return mapCounter
 }
 
 // 获取图片中第一个匹配的起始点的精准坐标
