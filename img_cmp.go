@@ -178,6 +178,50 @@ func getFirstPos(ptrPic *Pic, ptrSubPic *SubPic) *Pos {
 	return nil
 }
 
+// 获取图片中第一个匹配的起始点的精准坐标 单次匹配全部获取
+func getFirstPosAll(ptrPic *Pic, mapSubPic map[int]*SubPic) *Pos {
+	// 参数校验
+	assert(ptrPic != nil, "ptrPic == nil")
+	assert(len(mapSubPic) > 0, "len(mapSubPic) == 0")
+	if _, ok := mapSubPic[1]; !ok {
+		failOnError(errors.New("mapSubPic do not contain 1"), "getSubPicNumSlideXAll")
+	}
+
+	// 参数整理
+	picWidth := ptrPic.width()
+	picHeight := ptrPic.height()
+	picSubWidth := g_ptrConfig.BaseW
+	picSubHeight := g_ptrConfig.BaseH
+	if (picSubWidth == 0) || (picSubHeight == 0) {
+		picSubWidth = mapSubPic[1].width()
+		picSubHeight = mapSubPic[1].height()
+	}
+
+	hash := getHash()
+	pic := ptrPic.m_pic.(*image.YCbCr)
+	for y := 0; y <= (picHeight - picSubHeight); y += g_ptrConfig.StepY {
+		for x := 0; x <= (picWidth - picSubWidth); x += g_ptrConfig.StepX {
+			r := image.Rect(x, y, x+picSubWidth, y+picSubHeight)
+			subBaseI := pic.SubImage(r)
+			subBaseM := gocv.NewMat()
+			defer subBaseM.Close()
+			hashCompute(hash, subBaseI, &subBaseM)
+			for _, ptrSubPic := range mapSubPic {
+				if isSame, similar := isSameMat(hash, &subBaseM, &ptrSubPic.m_mat); isSame {
+					beginPos := newPos()
+					beginPos.init(x, y)
+					ptrResultPos, similarV := getMostSimilarPos(ptrPic, ptrSubPic, beginPos, picWidth, picHeight, picSubWidth, picSubHeight)
+					assert(ptrResultPos != nil, "ptrResultPos == nil")
+					logPrintf("值:%v,匹配成功起始点:(%v, %v),相似度:%v,最相似点:(%v, %v),相似度:%v", ptrSubPic.m_value, x, y, similar, ptrResultPos.m_x, ptrResultPos.m_y, similarV)
+					return ptrResultPos
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func getMostSimilarPos(ptrPic *Pic, ptrSubPic *SubPic, ptrBeginPos *Pos, picWidth, picHeight, picSubWidth, picSubHeight int) (*Pos, int) {
 	// 参数校验
 	assert(ptrPic != nil, "ptrPic == nil")

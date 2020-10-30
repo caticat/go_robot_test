@@ -97,3 +97,20 @@ func (this *PicMgr) getMatchBeginPos(ptrPic *Pic) *Pos {
 	}
 	return nil
 }
+
+// 获取所有子图片匹配的个数(x轴缩小,y轴不变) 单次匹配全部获取
+func (this *PicMgr) getMatchBeginPosAll(ptrPic *Pic) *Pos {
+	for _, ptrSubPic := range this.m_mapPic {
+		if ptrPos := getFirstPos(ptrPic, ptrSubPic); ptrPos != nil {
+			picSubWidth := g_ptrConfig.BaseW
+			if picSubWidth == 0 {
+				picSubWidth = ptrSubPic.width()
+			}
+			assert(picSubWidth > 0, "picSubWidth[%v] <= 0", picSubWidth)
+			// 向左平移至最小值
+			ptrPos.m_x = ptrPos.m_x - (ptrPos.m_x/picSubWidth)*picSubWidth
+			return ptrPos
+		}
+	}
+	return nil
+}
