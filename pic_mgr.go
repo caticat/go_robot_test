@@ -1,5 +1,7 @@
 package main
 
+import "errors"
+
 type PicMgr struct {
 	m_mapPic map[int]*SubPic
 }
@@ -28,52 +30,21 @@ func (this *PicMgr) calc(baseFileName string) {
 	ptrPic := newPic()
 	ptrPic.init(baseFileName)
 
-	// 获取到所有匹配的坐标
-	//for value, ptrSubPic := range this.m_mapPic {
-	//	sliPos := getSliPosInPic(ptrPic, ptrSubPic)
-	//	for _, ptrPos := range sliPos {
-	//		logPrintf("文件名:%v,值:%v,坐标:(%v,%v)", ptrSubPic.m_fileName, value, ptrPos.m_x, ptrPos.m_y)
-	//	}
-	//}
-
 	// 获取所有值出现的数量
-	//this.calcCounter(ptrPic)
 	this.calcCounterAll(ptrPic)
-}
-
-// 获取所有值出现的数量
-func (this *PicMgr) calcCounter(ptrPic *Pic) {
-	assert(ptrPic != nil, "ptrPic == nil")
-
-	ptrBeginPos := this.getMatchBeginPos(ptrPic)
-	if ptrBeginPos == nil {
-		logPrintf("没有任何图片匹配")
-		return
-	}
-
-	mapCounter := make(map[int]int)
-	for _, ptrSubPic := range this.m_mapPic {
-		counter := getSubPicNumSlideX(ptrPic, ptrSubPic, ptrBeginPos)
-		mapCounter[ptrSubPic.m_value] = counter
-	}
-
-	logPrintf("匹配类型数量:%v", len(mapCounter))
-	for value, counter := range mapCounter {
-		logPrintf("值:%v,数量:%v", value, counter)
-	}
 }
 
 // 获取所有值出现的数量 单次匹配全部获取
 func (this *PicMgr) calcCounterAll(ptrPic *Pic) {
 	assert(ptrPic != nil, "ptrPic == nil")
 
-	ptrBeginPos := this.getMatchBeginPos(ptrPic)
+	ptrBeginPos := this.getMatchBeginPosAll(ptrPic)
 	if ptrBeginPos == nil {
 		logPrintf("没有任何图片匹配")
 		return
 	}
 
-	mapCounter := getSubPicNumSlideXAll(ptrPic, this.m_mapPic, ptrBeginPos)
+	mapCounter := getSubPicNumSlideX(ptrPic, this.m_mapPic, ptrBeginPos)
 
 	logPrintf("匹配类型数量:%v", len(mapCounter))
 	for value, counter := range mapCounter {
@@ -81,36 +52,23 @@ func (this *PicMgr) calcCounterAll(ptrPic *Pic) {
 	}
 }
 
-// 获取所有子图片匹配的个数(x轴缩小,y轴不变)
-func (this *PicMgr) getMatchBeginPos(ptrPic *Pic) *Pos {
-	for _, ptrSubPic := range this.m_mapPic {
-		if ptrPos := getFirstPos(ptrPic, ptrSubPic); ptrPos != nil {
-			picSubWidth := g_ptrConfig.BaseW
-			if picSubWidth == 0 {
-				picSubWidth = ptrSubPic.width()
-			}
-			assert(picSubWidth > 0, "picSubWidth[%v] <= 0", picSubWidth)
-			// 向左平移至最小值
-			ptrPos.m_x = ptrPos.m_x - (ptrPos.m_x/picSubWidth)*picSubWidth
-			return ptrPos
-		}
-	}
-	return nil
-}
-
 // 获取所有子图片匹配的个数(x轴缩小,y轴不变) 单次匹配全部获取
 func (this *PicMgr) getMatchBeginPosAll(ptrPic *Pic) *Pos {
-	for _, ptrSubPic := range this.m_mapPic {
-		if ptrPos := getFirstPos(ptrPic, ptrSubPic); ptrPos != nil {
-			picSubWidth := g_ptrConfig.BaseW
-			if picSubWidth == 0 {
-				picSubWidth = ptrSubPic.width()
-			}
-			assert(picSubWidth > 0, "picSubWidth[%v] <= 0", picSubWidth)
-			// 向左平移至最小值
-			ptrPos.m_x = ptrPos.m_x - (ptrPos.m_x/picSubWidth)*picSubWidth
-			return ptrPos
-		}
+	assert(len(this.m_mapPic) > 0, "len(this.m_mapPic) == 0")
+	if _, ok := this.m_mapPic[1]; !ok {
+		failOnError(errors.New("this.m_mapPic do not testContain 1"), "getMatchBeginPosAll")
 	}
-	return nil
+
+	if ptrPos := getFirstPos(ptrPic, this.m_mapPic); ptrPos != nil {
+		picSubWidth := g_ptrConfig.BaseW
+		if picSubWidth == 0 {
+			picSubWidth = this.m_mapPic[1].width()
+		}
+		assert(picSubWidth > 0, "picSubWidth[%v] <= 0", picSubWidth)
+		// 向左平移至最小值
+		ptrPos.m_x = ptrPos.m_x - (ptrPos.m_x/picSubWidth)*picSubWidth
+		return ptrPos
+	} else {
+		return nil
+	}
 }
